@@ -23,7 +23,7 @@ python -m app.seed
 uvicorn app.main:app --reload
 ```
 
-Откройте Swagger UI: http://127.0.0.1:8000/docs
+Откройте Swagger UI: http://127.0.0.1:8000/
 
 ## Структура
 

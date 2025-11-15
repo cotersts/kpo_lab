@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from .. import schemas, crud
 
-router = APIRouter(prefix="/products", tags=["products"])
+router = APIRouter(tags=["products"])
 
 @router.post("/", response_model=schemas.Product, status_code=201)
 def create_product(payload: schemas.ProductCreate, db: Session = Depends(get_db)):

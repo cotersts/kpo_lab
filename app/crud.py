@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, func
 from datetime import datetime, date
 from . import models, schemas
@@ -73,13 +73,16 @@ def create_sale(db: Session, data: schemas.SaleCreate) -> models.Sale:
     return sale
 
 def list_sales(db: Session, date_from: date | None = None, date_to: date | None = None):
-    stmt = select(models.Sale)
+    stmt = (
+        select(models.Sale)
+        .options(joinedload(models.Sale.items).joinedload(models.SaleItem.product))
+    )
     if date_from:
         stmt = stmt.where(models.Sale.sale_date >= datetime.combine(date_from, datetime.min.time()))
     if date_to:
         stmt = stmt.where(models.Sale.sale_date < datetime.combine(date_to, datetime.min.time()))
     stmt = stmt.order_by(models.Sale.sale_date.desc())
-    return db.scalars(stmt).all()
+    return db.scalars(stmt).unique().all()
 
 def daily_summary(db: Session, day: date):
     start = datetime.combine(day, datetime.min.time())

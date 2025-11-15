@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime, date
 from typing import List, Optional
 
@@ -19,8 +19,7 @@ class ProductUpdate(BaseModel):
 
 class Product(ProductBase):
     id: int
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Customer Schemas ---
 class CustomerBase(BaseModel):
@@ -33,8 +32,7 @@ class CustomerCreate(CustomerBase):
 
 class Customer(CustomerBase):
     id: int
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Sale Schemas ---
 class SaleItemBase(BaseModel):
@@ -50,8 +48,7 @@ class SaleItem(SaleItemBase):
     id: int
     product: Product  # Включаем полную информацию о продукте
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SaleCreate(BaseModel):
     customer_id: Optional[int] = None
@@ -65,8 +62,7 @@ class Sale(BaseModel):
     total_amount: float
     items: List[SaleItem]  # Включаем список товаров
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DailySummary(BaseModel):
     date: date

@@ -13,7 +13,7 @@
         <div class="products-section">
             <h2>Товары</h2>
             <div class="toolbar">
-                <input type="text" id="product-search" placeholder="Поиск по названию...">
+                <input type="text" id="product-search" placeholder="Поиск по названию, артикулу или категории...">
                 <button id="add-product-btn">Добавить товар</button>
             </div>
             <ul id="product-list"></ul>
@@ -22,7 +22,9 @@
         <div class="sales-section">
             <h2>Продажи</h2>
             <div class="toolbar">
+                <label for="date-from">С:</label>
                 <input type="date" id="date-from">
+                <label for="date-to">По:</label>
                 <input type="date" id="date-to">
                 <button id="filter-sales-btn">Фильтр</button>
                 <button id="reset-filter-btn">Сбросить</button>
@@ -33,28 +35,58 @@
     </div>
 
     <div id="modal-backdrop" class="hidden"></div>
+    
     <div id="product-modal" class="modal hidden">
         <h3>Добавить/изменить товар</h3>
         <form id="product-form">
             <input type="hidden" id="product-id">
-            <label for="product-name">Название:</label>
-            <input type="text" id="product-name" required>
-            <label for="product-price">Цена:</label>
-            <input type="number" id="product-price" step="0.01" required>
-            <button type="submit">Сохранить</button>
-            <button type="button" class="cancel-btn">Отмена</button>
+            
+            <label for="product-sku">Артикул (SKU):</label>
+            <input type="text" id="product-sku" required 
+                   placeholder="Например: TV-43-SAM"
+                   pattern="[A-Za-z0-9\-_]+"
+                   title="Только буквы, цифры, дефисы и подчеркивания">
+            
+            <label for="product-name">Название товара:</label>
+            <input type="text" id="product-name" required 
+                   placeholder="Например: Телевизор Samsung 43'"
+                   minlength="2" maxlength="255">
+            
+            <label for="product-category">Категория:</label>
+            <select id="product-category">
+                <option value="TV">Телевизоры</option>
+                <option value="Washer">Стиральные машины</option>
+                <option value="Fridge">Холодильники</option>
+                <option value="Vacuum">Пылесосы</option>
+                <option value="Other">Другое</option>
+            </select>
+            
+            <label for="product-price">Цена (руб.):</label>
+            <input type="number" id="product-price" step="0.01" min="0.01" max="1000000" required>
+            
+            <div class="form-buttons">
+                <button type="submit">Сохранить</button>
+                <button type="button" class="cancel-btn">Отмена</button>
+            </div>
         </form>
     </div>
 
     <div id="sale-modal" class="modal hidden">
         <h3>Оформить продажу</h3>
         <form id="sale-form">
+            <label for="sale-customer">Клиент (опционально):</label>
+            <select id="sale-customer"></select>
+            
             <label for="sale-product">Товар:</label>
             <select id="sale-product" required></select>
+            
             <label for="sale-quantity">Количество:</label>
-            <input type="number" id="sale-quantity" min="1" value="1" required>
-            <button type="submit">Сохранить</button>
-            <button type="button" class="cancel-btn">Отмена</button>
+            <input type="number" id="sale-quantity" min="1" max="100" value="1" required>
+            
+            <div class="form-buttons">
+                <button type="submit">Сохранить</button>
+                <button type="button" class="cancel-btn">Отмена</button>
+            </div>
         </form>
     </div>
 

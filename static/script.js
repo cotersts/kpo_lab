@@ -3,6 +3,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const API_URL = '/api';
     const PRODUCTS_URL = `${API_URL}/products`;
     const SALES_URL = `${API_URL}/sales`;
+    const CUSTOMERS_URL = `${API_URL}/customers`;
+
+    // Utility functions
+    const showError = (message) => {
+        alert(`Ошибка: ${message}`);
+    };
+
+    const showSuccess = (message) => {
+        alert(`Успех: ${message}`);
+    };
+
+    const validateForm = (formData) => {
+        const errors = [];
+        
+        // Валидация цены
+        if (formData.price && (formData.price <= 0 || formData.price > 1000000)) {
+            errors.push('Цена должна быть от 0.01 до 1 000 000');
+        }
+        
+        // Валидация количества
+        if (formData.quantity && (formData.quantity < 1 || formData.quantity > 100)) {
+            errors.push('Количество должно быть от 1 до 100');
+        }
+        
+        return errors;
+    };
 
     // Product elements
     const productList = document.getElementById('product-list');
@@ -29,10 +55,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const productIdField = document.getElementById('product-id');
     const productNameField = document.getElementById('product-name');
     const productPriceField = document.getElementById('product-price');
+    const productSkuField = document.getElementById('product-sku');
+    const productCategoryField = document.getElementById('product-category');
 
     // Sale form fields
     const saleProductSelect = document.getElementById('sale-product');
     const saleQuantityField = document.getElementById('sale-quantity');
+    const saleCustomerSelect = document.getElementById('sale-customer');
 
     // --- UTILITY FUNCTIONS ---
     const showModal = (modal) => {
@@ -49,14 +78,33 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- API FUNCTIONS ---
     const fetchProducts = async (query = '') => {
         try {
-            const url = query ? `${PRODUCTS_URL}?q=${query}` : PRODUCTS_URL;
+            const url = query ? `${PRODUCTS_URL}?q=${encodeURIComponent(query)}` : PRODUCTS_URL;
             const response = await fetch(url);
-            if (!response.ok) throw new Error('Failed to fetch products');
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to fetch products');
+            }
             const products = await response.json();
             renderProducts(products);
             updateSaleProductOptions(products);
+            return products;
         } catch (error) {
             console.error('Error fetching products:', error);
+            showError(`Не удалось загрузить товары: ${error.message}`);
+        }
+    };
+
+    const fetchCustomers = async () => {
+        try {
+            const response = await fetch(CUSTOMERS_URL);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to fetch customers');
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching customers:', error);
+            return [];
         }
     };
 
@@ -65,12 +113,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams();
             if (from) params.append('date_from', from);
             if (to) params.append('date_to', to);
+            
             const response = await fetch(`${SALES_URL}?${params.toString()}`);
-            if (!response.ok) throw new Error('Failed to fetch sales');
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to fetch sales');
+            }
             const sales = await response.json();
             renderSales(sales);
+            return sales;
         } catch (error) {
             console.error('Error fetching sales:', error);
+            showError(`Не удалось загрузить продажи: ${error.message}`);
         }
     };
 
@@ -80,7 +134,11 @@ document.addEventListener('DOMContentLoaded', () => {
         products.forEach(product => {
             const li = document.createElement('li');
             li.innerHTML = `
-                <span>${product.name} - ${product.price} руб.</span>
+                <div>
+                    <strong>${product.name}</strong><br>
+                    <small>Артикул: ${product.sku} | Категория: ${product.category}</small><br>
+                    Цена: ${product.price.toFixed(2)} руб.
+                </div>
                 <div>
                     <button class="edit-product-btn" data-id="${product.id}">✏️</button>
                     <button class="delete-product-btn" data-id="${product.id}">🗑️</button>
@@ -94,12 +152,27 @@ document.addEventListener('DOMContentLoaded', () => {
         salesList.innerHTML = '';
         sales.forEach(sale => {
             const li = document.createElement('li');
-            const saleDate = new Date(sale.sale_date).toLocaleDateString();
-            // Предполагаем, что сервер вернет детализированную информацию о продаже
+            const saleDate = new Date(sale.sale_date).toLocaleDateString('ru-RU', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
             const itemsText = sale.items && sale.items.length > 0 
-                ? `${sale.items[0].product.name} x ${sale.items[0].quantity}`
-                : 'Детали не загружены';
-            li.textContent = `${saleDate}: ${itemsText} = ${sale.total_amount} руб.`;
+                ? sale.items.map(item => 
+                    `${item.product.name} × ${item.quantity}`
+                ).join(', ')
+                : 'Нет товаров';
+            
+            li.innerHTML = `
+                <div>
+                    <strong>${saleDate}</strong><br>
+                    Товары: ${itemsText}<br>
+                    Итого: ${sale.total_amount.toFixed(2)} руб.
+                </div>
+            `;
             salesList.appendChild(li);
         });
     };
@@ -109,15 +182,34 @@ document.addEventListener('DOMContentLoaded', () => {
         products.forEach(product => {
             const option = document.createElement('option');
             option.value = product.id;
-            option.textContent = `${product.name} (${product.price} руб.)`;
-            option.dataset.price = product.price; // Сохраняем цену здесь
+            option.textContent = `${product.name} (${product.price.toFixed(2)} руб.)`;
+            option.dataset.price = product.price;
             saleProductSelect.appendChild(option);
+        });
+    };
+
+    const updateCustomerOptions = async () => {
+        const customers = await fetchCustomers();
+        saleCustomerSelect.innerHTML = '<option value="">Без клиента</option>';
+        customers.forEach(customer => {
+            const option = document.createElement('option');
+            option.value = customer.id;
+            option.textContent = `${customer.name} ${customer.phone ? `(${customer.phone})` : ''}`;
+            saleCustomerSelect.appendChild(option);
         });
     };
 
     // --- EVENT LISTENERS ---
     productSearch.addEventListener('input', () => fetchProducts(productSearch.value));
-    filterSalesBtn.addEventListener('click', () => fetchSales(dateFrom.value, dateTo.value));
+    
+    filterSalesBtn.addEventListener('click', () => {
+        if (dateFrom.value && dateTo.value && dateFrom.value > dateTo.value) {
+            showError('Дата начала не может быть позже даты окончания');
+            return;
+        }
+        fetchSales(dateFrom.value, dateTo.value);
+    });
+    
     resetFilterBtn.addEventListener('click', () => {
         dateFrom.value = '';
         dateTo.value = '';
@@ -127,11 +219,13 @@ document.addEventListener('DOMContentLoaded', () => {
     addProductBtn.addEventListener('click', () => {
         productForm.reset();
         productIdField.value = '';
+        productSkuField.value = `SKU-${Date.now().toString().slice(-6)}`;
         showModal(productModal);
     });
 
-    addSaleBtn.addEventListener('click', () => {
+    addSaleBtn.addEventListener('click', async () => {
         saleForm.reset();
+        await updateCustomerOptions();
         showModal(saleModal);
     });
 
@@ -140,28 +234,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
     productForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const id = productIdField.value;
-        const productData = {
+        
+        const formData = {
+            sku: productSkuField.value,
             name: productNameField.value,
-            price: parseFloat(productPriceField.value),
-            sku: `SKU-${Date.now()}`, // Генерируем уникальный SKU
-            category: 'Default', // Используем категорию по умолчанию
+            category: productCategoryField.value || 'Other',
+            price: parseFloat(productPriceField.value)
         };
 
+        // Валидация на клиенте
+        const errors = validateForm(formData);
+        if (errors.length > 0) {
+            showError(errors.join('\n'));
+            return;
+        }
+
+        const id = productIdField.value;
         const method = id ? 'PATCH' : 'POST';
         const url = id ? `${PRODUCTS_URL}/${id}` : PRODUCTS_URL;
 
         try {
             const response = await fetch(url, {
                 method: method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(productData),
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(formData),
             });
-            if (!response.ok) throw new Error('Failed to save product');
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Failed to save product');
+            }
+            
             hideModals();
+            showSuccess(id ? 'Товар обновлен' : 'Товар добавлен');
             fetchProducts();
         } catch (error) {
             console.error('Error saving product:', error);
+            showError(`Не удалось сохранить товар: ${error.message}`);
         }
     });
 
@@ -170,19 +282,30 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const selectedOption = saleProductSelect.options[saleProductSelect.selectedIndex];
         if (!selectedOption || !selectedOption.value) {
-            alert('Пожалуйста, выберите товар.');
+            showError('Пожалуйста, выберите товар');
             return;
         }
-        const unitPrice = parseFloat(selectedOption.dataset.price);
-        const productId = parseInt(saleProductSelect.value);
-        const quantity = parseInt(saleQuantityField.value);
+
+        const formData = {
+            productId: parseInt(saleProductSelect.value),
+            quantity: parseInt(saleQuantityField.value),
+            customerId: saleCustomerSelect.value ? parseInt(saleCustomerSelect.value) : null
+        };
+
+        // Валидация на клиенте
+        const errors = validateForm(formData);
+        if (errors.length > 0) {
+            showError(errors.join('\n'));
+            return;
+        }
 
         const saleData = {
+            customer_id: formData.customerId,
             items: [
                 {
-                    product_id: productId,
-                    quantity: quantity,
-                    unit_price: unitPrice
+                    product_id: formData.productId,
+                    quantity: formData.quantity,
+                    unit_price: parseFloat(selectedOption.dataset.price)
                 }
             ]
         };
@@ -190,18 +313,24 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(SALES_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
                 body: JSON.stringify(saleData),
             });
+            
             if (!response.ok) {
                 const errorData = await response.json();
-                console.error('Server validation error:', errorData);
-                throw new Error('Failed to create sale');
+                throw new Error(errorData.detail || 'Failed to create sale');
             }
+            
             hideModals();
+            showSuccess('Продажа успешно оформлена');
             fetchSales();
         } catch (error) {
             console.error('Error creating sale:', error);
+            showError(`Не удалось оформить продажу: ${error.message}`);
         }
     });
 
@@ -212,11 +341,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.classList.contains('delete-product-btn')) {
             if (confirm('Вы уверены, что хотите удалить этот товар?')) {
                 try {
-                    const response = await fetch(`${PRODUCTS_URL}/${id}`, { method: 'DELETE' });
-                    if (!response.ok) throw new Error('Failed to delete product');
+                    const response = await fetch(`${PRODUCTS_URL}/${id}`, { 
+                        method: 'DELETE' 
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Failed to delete product');
+                    }
+                    
+                    showSuccess('Товар удален');
                     fetchProducts();
                 } catch (error) {
                     console.error('Error deleting product:', error);
+                    showError(`Не удалось удалить товар: ${error.message}`);
                 }
             }
         }
@@ -224,19 +362,35 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.classList.contains('edit-product-btn')) {
             try {
                 const response = await fetch(`${PRODUCTS_URL}/${id}`);
-                if (!response.ok) throw new Error('Failed to fetch product details');
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to fetch product details');
+                }
+                
                 const product = await response.json();
                 productIdField.value = product.id;
+                productSkuField.value = product.sku;
                 productNameField.value = product.name;
+                productCategoryField.value = product.category;
                 productPriceField.value = product.price;
                 showModal(productModal);
             } catch (error) {
                 console.error('Error fetching product details:', error);
+                showError(`Не удалось загрузить данные товара: ${error.message}`);
             }
         }
     });
 
+    // Установка текущей даты по умолчанию для фильтров
+    const today = new Date().toISOString().split('T')[0];
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const weekAgoStr = weekAgo.toISOString().split('T')[0];
+    
+    dateFrom.value = weekAgoStr;
+    dateTo.value = today;
+
     // Initial data load
     fetchProducts();
-    fetchSales();
+    fetchSales(weekAgoStr, today);
 });

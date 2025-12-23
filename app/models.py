@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from sqlalchemy.orm import relationship, Mapped, mapped_column
-from datetime import datetime
+from datetime import datetime, timezone
 from .database import Base
 
 class Product(Base):
@@ -28,7 +28,7 @@ class Sale(Base):
     __tablename__ = "sales"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    sale_date: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    sale_date: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), nullable=True)
     total_amount: Mapped[float] = mapped_column(Float, default=0.0)
 

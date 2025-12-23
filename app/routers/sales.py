@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from .. import schemas, crud
 
-router = APIRouter(prefix="/sales", tags=["sales"])
+router = APIRouter(tags=["sales"])
 
 @router.post("/", response_model=schemas.Sale, status_code=201)
 def create_sale(payload: schemas.SaleCreate, db: Session = Depends(get_db)):

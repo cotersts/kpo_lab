@@ -24,10 +24,12 @@ unit, BDD, GUI (без Selenium) и нагрузочное тестирован�
 
 Windows PowerShell:
 python -m venv .venv
+Затем
 .venv\Scripts\Activate.ps1
 
 Linux / macOS:
 python3 -m venv .venv
+Затем
 source .venv/bin/activate
 
 2. Установка зависимостей
@@ -75,7 +77,7 @@ tests/
   load/              — нагрузочные тесты (Locust)
 
 --------------------------------------------------
-ИНСТРУМЕНТЫ ТЕСТИРОВАНИЯ (5.2)
+ИНСТРУМЕНТЫ ТЕСТИРОВАНИЯ 
 --------------------------------------------------
 
 • Юнит-тесты: pytest
@@ -87,35 +89,26 @@ tests/
 
 
 --------------------------------------------------
-ЗАПУСК ТЕСТОВ
+ЗАПУСК ТЕСТОВ (в другом терминале)
 --------------------------------------------------
 
 Юнит-тесты:
-pytest -q tests/unit
+pytest tests/test_unit_crud.py --cov=app --cov-report=term-missing
 
 BDD:
-pytest -q tests/bdd
+pytest tests/bdd -s -vv
 
 GUI (static):
-pytest -q tests/ui
+pytest tests/ui -vv
+
 
 --------------------------------------------------
-НАГРУЗОЧНОЕ ТЕСТИРОВАНИЕ (Locust)
---------------------------------------------------
-
-1. Запустить API:
-uvicorn app.main:app --reload
-
-2. Запустить Locust:
-locust -f tests/load/locustfile.py --host=http://127.0.0.1:8000
-
-3. Открыть в браузере:
-http://127.0.0.1:8089
+НАГРУЗОЧНОЕ ТЕСТИРОВАНИЕ python tests/load/run_load.py
 
 В отчёте демонстрируются:
 • Summary
-• Statistics (по эндпоинтам)
-• Latency / RPS
+• FUNCTION (по эндпоинтам)
+• FUNCTION DETAILS
 • Failures (при наличии)
 
 

@@ -81,7 +81,7 @@ def status_ok(code: int) -> bool:
 async def seed_entities(client: httpx.AsyncClient) -> Tuple[Optional[int], Optional[int]]:
     """
     Создаём 1 товар и 1 клиента для продажи.
-    Если у тебя ограничения/валидации другие — подгони payload под ваш API.
+    .
     """
     product_id = None
     customer_id = None
@@ -163,7 +163,7 @@ async def worker(
     async with httpx.AsyncClient(base_url=BASE_URL, timeout=TIMEOUT) as client:
         rnd = random.Random(SEED + wid)
 
-        # веса (можно поменять)
+        # веса 
         ops = [
             ("GET /products", lambda: op_get_products(client), 45),
             ("POST /products", lambda: op_create_product(client), 15),

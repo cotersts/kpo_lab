@@ -116,7 +116,7 @@ def test_js_binds_add_sale_button_to_update_customers_and_show_sale_modal():
     )
 
 
-# 7 (новый) — кнопки отмены и клик по backdrop закрывают модалки
+# 7 
 def test_js_binds_cancel_and_backdrop_to_hideModals():
     assert_re(
         JS,
@@ -130,7 +130,7 @@ def test_js_binds_cancel_and_backdrop_to_hideModals():
     )
 
 
-# 8 (новый) — submit товара отправляет POST/PATCH на /api/products и потом вызывает fetchProducts()
+# 8 
 def test_js_product_form_submit_sends_request_and_refreshes_products():
     # метод выбирается по наличию id
     assert_re(
@@ -160,7 +160,7 @@ def test_js_product_form_submit_sends_request_and_refreshes_products():
     )
 
 
-# 9 (новый) — submit продажи отправляет POST на /api/sales и потом вызывает fetchSales()
+# 9 
 def test_js_sale_form_submit_posts_sales_and_refreshes_sales():
     assert_re(
         JS,
@@ -179,7 +179,7 @@ def test_js_sale_form_submit_posts_sales_and_refreshes_sales():
     )
 
 
-# 10 (новый) — клик по списку товаров обрабатывает delete/edit и вызывает нужные API
+# 10 
 def test_js_product_list_click_handles_delete_and_edit():
     # delete -> fetch(`${PRODUCTS_URL}/${id}`, { method: 'DELETE' })
     assert_re(

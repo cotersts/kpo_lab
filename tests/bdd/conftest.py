@@ -9,12 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# ====== ВАЖНО ======
-# Предполагаю стандартную структуру:
-# app/main.py -> FastAPI app + dependency get_db
-# app/models.py -> Base (SQLAlchemy declarative base)
-#
-# Если у тебя названия отличаются — поменяй импорты ниже под твой проект.
+
 from app.main import app, get_db  # noqa
 from app.models import Base  # noqa
 
@@ -63,12 +58,7 @@ def client():
 
 # ------------------ helpers ------------------
 def _parse_payload(json_str: str) -> Any:
-    """
-    В .feature у тебя пишется JSON (с null/true/false).
-    Иногда люди пишут почти-python. Поэтому делаем 2 попытки:
-    1) json.loads (нормальный JSON)
-    2) ast.literal_eval (на всякий случай) с заменой null/true/false
-    """
+    
     s = json_str.strip()
 
     # 1) нормальный JSON
@@ -111,7 +101,7 @@ def given_customer_exists(client: TestClient, email: str):
         "/api/customers",
         json={"name": "Existing", "phone": "+7-900-000-00-99", "email": email},
     )
-    # если у тебя дубль -> 400, это ок (главное: клиент существует)
+    
     assert resp.status_code in (201, 400), resp.text
 
 
@@ -144,7 +134,7 @@ def given_product_customer_sale(client: TestClient):
     customer_id = cu.json()["id"]
 
     # 3) sale
-    # ВАЖНО: у тебя unit_price REQUIRED (судя по 422), поэтому отправляем всегда.
+    
     sl = client.post(
         "/api/sales",
         json={
@@ -217,7 +207,7 @@ def assert_json_field_equals_any(request, field: str, value: str):
     Работает для:
     - "строк" в кавычках
     - чисел без кавычек (в т.ч. 12345.670000)
-    - true/false/null (если вдруг будет)
+    - true/false/null 
     """
     resp = _get_response(request)
     data: Dict[str, Any] = resp.json()

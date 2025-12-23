@@ -122,7 +122,7 @@ def create_sample_sale(
 # --- ТЕСТЫ ДЛЯ ПРОДУКТОВ ---
 
 def test_create_and_get_product(db):
-    """Тест 1: Создание и получение товара"""
+    """ Создание и получение товара"""
     # Arrange
     product_in = schemas.ProductCreate(
         sku="TV-43-TEST",
@@ -146,7 +146,7 @@ def test_create_and_get_product(db):
 
 
 def test_create_product_with_invalid_sku_should_fail():
-    """Тест 8: Создание товара с некорректным SKU должно вызвать ошибку валидации Pydantic"""
+    """Создание товара с некорректным SKU должно вызвать ошибку валидации Pydantic"""
     # Arrange & Act & Assert
     with pytest.raises(ValidationError) as exc_info:
         schemas.ProductCreate(
@@ -164,7 +164,7 @@ def test_create_product_with_invalid_sku_should_fail():
 
 
 def test_create_product_with_high_price_should_fail():
-    """Тест 9: Создание товара с ценой > 1,000,000 должно вызвать ошибку валидации Pydantic"""
+    """Создание товара с ценой > 1,000,000 должно вызвать ошибку валидации Pydantic"""
     # Arrange & Act & Assert
     with pytest.raises(ValidationError) as exc_info:
         schemas.ProductCreate(
@@ -182,7 +182,7 @@ def test_create_product_with_high_price_should_fail():
 
 
 def test_create_product_with_duplicate_sku_should_fail(db):
-    """Тест 16: Создание товара с дублирующимся SKU должно вызвать ошибку бизнес-логики"""
+    """Создание товара с дублирующимся SKU должно вызвать ошибку бизнес-логики"""
     # Arrange
     product1_in = schemas.ProductCreate(
         sku="DUPLICATE-SKU",
@@ -208,7 +208,7 @@ def test_create_product_with_duplicate_sku_should_fail(db):
 
 
 def test_list_products_with_query_filters_by_name_and_sku(db):
-    """Тест 13: Поиск товаров по названию и SKU"""
+    """Поиск товаров по названию и SKU"""
     # Arrange
     create_sample_product(db, sku="TV-SAM-43", name="Samsung 43", category="TV")
     create_sample_product(db, sku="TV-LG-55", name="LG 55", category="TV")
@@ -234,7 +234,7 @@ def test_list_products_with_query_filters_by_name_and_sku(db):
 
 
 def test_update_product_updates_only_provided_fields(db):
-    """Тест 14: Обновление только указанных полей товара"""
+    """Обновление только указанных полей товара"""
     # Arrange
     product = create_sample_product(
         db,
@@ -287,7 +287,7 @@ def test_update_product_returns_none_for_missing_product(db):
 
 
 def test_delete_product_removes_it_and_returns_true(db):
-    """Тест 6: Удаление товара"""
+    """ Удаление товара"""
     # Arrange
     product = create_sample_product(db)
 
@@ -341,7 +341,7 @@ def test_create_and_list_customers(db):
 
 
 def test_create_customer_with_invalid_email_should_fail():
-    """Тест 20: Создание клиента с некорректным email должно вызвать ошибку Pydantic"""
+    """Создание клиента с некорректным email должно вызвать ошибку Pydantic"""
     # Arrange & Act & Assert
     with pytest.raises(ValidationError) as exc_info:
         schemas.CustomerCreate(
@@ -382,7 +382,7 @@ def test_create_customer_with_duplicate_email_should_fail(db):
 # --- ТЕСТЫ ДЛЯ ПРОДАЖ ---
 
 def test_create_sale_calculates_total_and_creates_items(db):
-    """Тест 5: Создание продажи с расчетом общей суммы"""
+    """ Создание продажи с расчетом общей суммы"""
     # Arrange
     product = create_sample_product(db, price=5000.0)
     customer = create_sample_customer(db)
@@ -416,7 +416,7 @@ def test_create_sale_calculates_total_and_creates_items(db):
 
 
 def test_create_sale_with_zero_quantity_should_fail():
-    """Тест 11: Создание продажи с количеством 0 должно вызвать ошибку Pydantic"""
+    """Создание продажи с количеством 0 должно вызвать ошибку Pydantic"""
     # Arrange & Act & Assert
     with pytest.raises(ValidationError) as exc_info:
         schemas.SaleItemCreate(
@@ -432,7 +432,7 @@ def test_create_sale_with_zero_quantity_should_fail():
 
 
 def test_create_sale_with_high_quantity_should_fail():
-    """Тест 12: Создание продажи с количеством > 100 должно вызвать ошибку Pydantic"""
+    """Создание продажи с количеством > 100 должно вызвать ошибку Pydantic"""
     # Arrange & Act & Assert
     with pytest.raises(ValidationError) as exc_info:
         schemas.SaleItemCreate(
@@ -448,7 +448,7 @@ def test_create_sale_with_high_quantity_should_fail():
 
 
 def test_create_sale_with_empty_items_should_fail():
-    """Тест 19: Создание продажи без товаров должно вызвать ошибку Pydantic"""
+    """Создание продажи без товаров должно вызвать ошибку Pydantic"""
     # Arrange & Act & Assert
     with pytest.raises(ValidationError) as exc_info:
         schemas.SaleCreate(
@@ -490,7 +490,7 @@ def test_create_sale_with_duplicate_products_should_fail():
 
 
 def test_create_sale_with_nonexistent_product_should_fail(db):
-    """Тест 17: Создание продажи с несуществующим товаром должно вызвать ошибку бизнес-логики"""
+    """ Создание продажи с несуществующим товаром должно вызвать ошибку бизнес-логики"""
     # Arrange
     customer = create_sample_customer(db)
     sale_in = schemas.SaleCreate(
@@ -513,7 +513,7 @@ def test_create_sale_with_nonexistent_product_should_fail(db):
 
 
 def test_create_sale_with_nonexistent_customer_should_fail(db):
-    """Тест 18: Создание продажи с несуществующим клиентом должно вызвать ошибку бизнес-логики"""
+    """ Создание продажи с несуществующим клиентом должно вызвать ошибку бизнес-логики"""
     # Arrange
     product = create_sample_product(db, price=1000.0)
     sale_in = schemas.SaleCreate(
@@ -536,7 +536,7 @@ def test_create_sale_with_nonexistent_customer_should_fail(db):
 
 
 def test_list_sales_filters_by_date_range(db):
-    """Тест 7: Фильтрация продаж по дате"""
+    """: Фильтрация продаж по дате"""
     # Arrange
     product = create_sample_product(db, price=1000.0)
     customer = create_sample_customer(db)
@@ -627,7 +627,7 @@ def test_daily_summary_for_empty_day(db):
 
 
 def test_create_product_with_negative_price_should_fail():
-    """Тест 2: Создание товара с отрицательной ценой должно вызвать ошибку Pydantic"""
+    """ Создание товара с отрицательной ценой должно вызвать ошибку Pydantic"""
     # Arrange & Act & Assert
     with pytest.raises(ValidationError) as exc_info:
         schemas.ProductCreate(
@@ -644,7 +644,7 @@ def test_create_product_with_negative_price_should_fail():
 
 
 def test_create_product_with_zero_price_should_fail():
-    """Тест 3: Создание товара с нулевой ценой должно вызвать ошибку Pydantic"""
+    """ Создание товара с нулевой ценой должно вызвать ошибку Pydantic"""
     # Arrange & Act & Assert
     with pytest.raises(ValidationError) as exc_info:
         schemas.ProductCreate(
@@ -661,7 +661,7 @@ def test_create_product_with_zero_price_should_fail():
 
 
 def test_create_product_with_fractional_price_success():
-    """Тест 4: Создание товара с дробной ценой должно быть успешным"""
+    """ Создание товара с дробной ценой должно быть успешным"""
     # Arrange & Act
     product = schemas.ProductCreate(
         sku="FRACTIONAL",

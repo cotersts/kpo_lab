@@ -1,10 +1,16 @@
-# tests/test_unit_crud.py
+import sys
+import os
 from datetime import datetime, date
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from fastapi import HTTPException
+from pydantic import ValidationError
+
+# Добавляем корневую директорию проекта в sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.database import Base
 from app import crud, schemas, models
@@ -115,8 +121,8 @@ def create_sample_sale(
 
 # --- ТЕСТЫ ДЛЯ ПРОДУКТОВ ---
 
-
 def test_create_and_get_product(db):
+    """Тест 1: Создание и получение товара"""
     # Arrange
     product_in = schemas.ProductCreate(
         sku="TV-43-TEST",
@@ -139,7 +145,70 @@ def test_create_and_get_product(db):
     assert fetched.price == pytest.approx(39990.0)
 
 
+def test_create_product_with_invalid_sku_should_fail():
+    """Тест 8: Создание товара с некорректным SKU должно вызвать ошибку валидации Pydantic"""
+    # Arrange & Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        schemas.ProductCreate(
+            sku="INVALID@#$",
+            name="Товар",
+            category="TV",
+            price=1000.0,
+        )
+    
+    # Проверяем что ошибка связана с валидацией SKU
+    errors = exc_info.value.errors()
+    assert len(errors) == 1
+    assert errors[0]['loc'][0] == 'sku'
+    assert 'pattern' in errors[0]['type']
+
+
+def test_create_product_with_high_price_should_fail():
+    """Тест 9: Создание товара с ценой > 1,000,000 должно вызвать ошибку валидации Pydantic"""
+    # Arrange & Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        schemas.ProductCreate(
+            sku="HIGH-PRICE",
+            name="Дорогой товар",
+            category="Other",
+            price=2000000.0,
+        )
+    
+    # Проверяем что ошибка связана с валидацией цены
+    errors = exc_info.value.errors()
+    assert len(errors) == 1
+    assert errors[0]['loc'][0] == 'price'
+    assert 'less_than_equal' in errors[0]['type']
+
+
+def test_create_product_with_duplicate_sku_should_fail(db):
+    """Тест 16: Создание товара с дублирующимся SKU должно вызвать ошибку бизнес-логики"""
+    # Arrange
+    product1_in = schemas.ProductCreate(
+        sku="DUPLICATE-SKU",
+        name="Товар 1",
+        category="TV",
+        price=1000.0,
+    )
+    crud.create_product(db, product1_in)
+    
+    product2_in = schemas.ProductCreate(
+        sku="DUPLICATE-SKU",
+        name="Товар 2",
+        category="TV",
+        price=2000.0,
+    )
+    
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        crud.create_product(db, product2_in)
+    
+    assert exc_info.value.status_code == 400
+    assert "уже существует" in exc_info.value.detail
+
+
 def test_list_products_with_query_filters_by_name_and_sku(db):
+    """Тест 13: Поиск товаров по названию и SKU"""
     # Arrange
     create_sample_product(db, sku="TV-SAM-43", name="Samsung 43", category="TV")
     create_sample_product(db, sku="TV-LG-55", name="LG 55", category="TV")
@@ -150,6 +219,8 @@ def test_list_products_with_query_filters_by_name_and_sku(db):
     by_name = crud.list_products(db, q="sams")
     # поиск по части sku (должен найти только WM-BOSCH)
     by_sku = crud.list_products(db, q="bosch")
+    # поиск по категории
+    by_category = crud.list_products(db, q="washer")
 
     # Assert
     assert len(by_name) == 1
@@ -157,9 +228,13 @@ def test_list_products_with_query_filters_by_name_and_sku(db):
 
     assert len(by_sku) == 1
     assert by_sku[0].sku == "WM-BOSCH"
+    
+    assert len(by_category) == 1
+    assert by_category[0].category == "Washer"
 
 
 def test_update_product_updates_only_provided_fields(db):
+    """Тест 14: Обновление только указанных полей товара"""
     # Arrange
     product = create_sample_product(
         db,
@@ -181,11 +256,26 @@ def test_update_product_updates_only_provided_fields(db):
     assert updated.id == product.id
     assert updated.name == "New Name"
     # остальные поля не изменились
+    assert updated.sku == "SKU-OLD"
     assert updated.category == "OldCategory"
     assert updated.price == pytest.approx(100.0)
 
 
+def test_update_product_with_invalid_sku_should_fail():
+    """Обновление товара с некорректным SKU должно вызвать ошибку Pydantic"""
+    # Arrange & Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        schemas.ProductUpdate(
+            sku="INVALID@#$"
+        )
+    
+    errors = exc_info.value.errors()
+    assert len(errors) == 1
+    assert errors[0]['loc'][0] == 'sku'
+
+
 def test_update_product_returns_none_for_missing_product(db):
+    """Обновление несуществующего товара должно вернуть None"""
     # Arrange
     update_data = schemas.ProductUpdate(name="Does not matter")
 
@@ -197,6 +287,7 @@ def test_update_product_returns_none_for_missing_product(db):
 
 
 def test_delete_product_removes_it_and_returns_true(db):
+    """Тест 6: Удаление товара"""
     # Arrange
     product = create_sample_product(db)
 
@@ -209,7 +300,23 @@ def test_delete_product_removes_it_and_returns_true(db):
     assert deleted is None
 
 
+def test_delete_product_used_in_sales_should_fail(db):
+    """Удаление товара, используемого в продажах, должно вызвать ошибку"""
+    # Arrange
+    product = create_sample_product(db)
+    customer = create_sample_customer(db)
+    create_sample_sale(db, product, customer)
+    
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        crud.delete_product(db, product.id)
+    
+    assert exc_info.value.status_code == 400
+    assert "используется в продажах" in exc_info.value.detail
+
+
 def test_delete_product_returns_false_for_missing_product(db):
+    """Удаление несуществующего товара должно вернуть False"""
     # Arrange / Act
     ok = crud.delete_product(db, product_id=12345)
 
@@ -219,8 +326,8 @@ def test_delete_product_returns_false_for_missing_product(db):
 
 # --- ТЕСТЫ ДЛЯ КЛИЕНТОВ ---
 
-
 def test_create_and_list_customers(db):
+    """Создание и получение списка клиентов"""
     # Arrange
     create_sample_customer(db, name="Петров Петр")
     create_sample_customer(db, name="Иванов Иван")
@@ -233,10 +340,49 @@ def test_create_and_list_customers(db):
     assert {"Петров Петр", "Иванов Иван"}.issubset(names)
 
 
+def test_create_customer_with_invalid_email_should_fail():
+    """Тест 20: Создание клиента с некорректным email должно вызвать ошибку Pydantic"""
+    # Arrange & Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        schemas.CustomerCreate(
+            name="Тестовый Клиент",
+            phone="+79990000000",
+            email="неправильный@email",  # Некорректный email
+        )
+    
+    errors = exc_info.value.errors()
+    assert len(errors) == 1
+    assert errors[0]['loc'][0] == 'email'
+
+
+def test_create_customer_with_duplicate_email_should_fail(db):
+    """Создание клиента с дублирующимся email должно вызвать ошибку бизнес-логики"""
+    # Arrange
+    customer1_in = schemas.CustomerCreate(
+        name="Клиент 1",
+        phone="+79990000001",
+        email="test@example.com",
+    )
+    crud.create_customer(db, customer1_in)
+    
+    customer2_in = schemas.CustomerCreate(
+        name="Клиент 2",
+        phone="+79990000002",
+        email="test@example.com",  # Дублирующийся email
+    )
+    
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        crud.create_customer(db, customer2_in)
+    
+    assert exc_info.value.status_code == 400
+    assert "уже существует" in exc_info.value.detail
+
+
 # --- ТЕСТЫ ДЛЯ ПРОДАЖ ---
 
-
 def test_create_sale_calculates_total_and_creates_items(db):
+    """Тест 5: Создание продажи с расчетом общей суммы"""
     # Arrange
     product = create_sample_product(db, price=5000.0)
     customer = create_sample_customer(db)
@@ -269,7 +415,128 @@ def test_create_sale_calculates_total_and_creates_items(db):
     assert item.unit_price == pytest.approx(unit_price)
 
 
+def test_create_sale_with_zero_quantity_should_fail():
+    """Тест 11: Создание продажи с количеством 0 должно вызвать ошибку Pydantic"""
+    # Arrange & Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        schemas.SaleItemCreate(
+            product_id=1,
+            quantity=0,  # Некорректное количество
+            unit_price=1000.0,
+        )
+    
+    errors = exc_info.value.errors()
+    assert len(errors) == 1
+    assert errors[0]['loc'][0] == 'quantity'
+    assert 'greater_than' in errors[0]['type']
+
+
+def test_create_sale_with_high_quantity_should_fail():
+    """Тест 12: Создание продажи с количеством > 100 должно вызвать ошибку Pydantic"""
+    # Arrange & Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        schemas.SaleItemCreate(
+            product_id=1,
+            quantity=101,  # Некорректное количество
+            unit_price=1000.0,
+        )
+    
+    errors = exc_info.value.errors()
+    assert len(errors) == 1
+    assert errors[0]['loc'][0] == 'quantity'
+    assert 'less_than_equal' in errors[0]['type']
+
+
+def test_create_sale_with_empty_items_should_fail():
+    """Тест 19: Создание продажи без товаров должно вызвать ошибку Pydantic"""
+    # Arrange & Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        schemas.SaleCreate(
+            customer_id=None,
+            items=[],  # Пустой список
+        )
+    
+    errors = exc_info.value.errors()
+    assert len(errors) == 1
+    assert errors[0]['loc'][0] == 'items'
+    assert 'too_short' in errors[0]['type']
+
+
+def test_create_sale_with_duplicate_products_should_fail():
+    """Создание продажи с дублирующимися товарами должно вызвать ошибку валидации"""
+    # Arrange
+    sale_item1 = schemas.SaleItemCreate(
+        product_id=1,
+        quantity=1,
+        unit_price=1000.0,
+    )
+    sale_item2 = schemas.SaleItemCreate(
+        product_id=1,  # Дублирующийся product_id
+        quantity=2,
+        unit_price=1000.0,
+    )
+    
+    # Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        schemas.SaleCreate(
+            customer_id=None,
+            items=[sale_item1, sale_item2],
+        )
+    
+    errors = exc_info.value.errors()
+    assert len(errors) == 1
+    assert errors[0]['loc'][0] == 'items'
+    assert 'value_error' in errors[0]['type']
+
+
+def test_create_sale_with_nonexistent_product_should_fail(db):
+    """Тест 17: Создание продажи с несуществующим товаром должно вызвать ошибку бизнес-логики"""
+    # Arrange
+    customer = create_sample_customer(db)
+    sale_in = schemas.SaleCreate(
+        customer_id=customer.id,
+        items=[
+            schemas.SaleItemCreate(
+                product_id=99999,  # Несуществующий товар
+                quantity=1,
+                unit_price=1000.0,
+            )
+        ],
+    )
+    
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        crud.create_sale(db, sale_in)
+    
+    assert exc_info.value.status_code == 404
+    assert "не найден" in exc_info.value.detail
+
+
+def test_create_sale_with_nonexistent_customer_should_fail(db):
+    """Тест 18: Создание продажи с несуществующим клиентом должно вызвать ошибку бизнес-логики"""
+    # Arrange
+    product = create_sample_product(db, price=1000.0)
+    sale_in = schemas.SaleCreate(
+        customer_id=99999,  # Несуществующий клиент
+        items=[
+            schemas.SaleItemCreate(
+                product_id=product.id,
+                quantity=1,
+                unit_price=1000.0,
+            )
+        ],
+    )
+    
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        crud.create_sale(db, sale_in)
+    
+    assert exc_info.value.status_code == 404
+    assert "не найден" in exc_info.value.detail
+
+
 def test_list_sales_filters_by_date_range(db):
+    """Тест 7: Фильтрация продаж по дате"""
     # Arrange
     product = create_sample_product(db, price=1000.0)
     customer = create_sample_customer(db)
@@ -302,6 +569,7 @@ def test_list_sales_filters_by_date_range(db):
 
 
 def test_list_sales_loads_items_and_products(db):
+    """Продажи должны загружаться с товарами и информацией о продуктах"""
     # Arrange
     product = create_sample_product(db, sku="SKU-ITEM-1", name="Товар для продажи")
     sale = create_sample_sale(db, product, quantity=2, unit_price=1234.0)
@@ -321,6 +589,7 @@ def test_list_sales_loads_items_and_products(db):
 
 
 def test_daily_summary_returns_correct_count_and_revenue(db):
+    """Получение дневной статистики по продажам"""
     # Arrange
     product = create_sample_product(db, price=1000.0)
     customer = create_sample_customer(db)
@@ -342,3 +611,82 @@ def test_daily_summary_returns_correct_count_and_revenue(db):
     # Assert
     assert count == 2
     assert revenue == pytest.approx(expected_revenue)
+
+
+def test_daily_summary_for_empty_day(db):
+    """Статистика за день без продаж должна вернуть 0"""
+    # Arrange
+    empty_day = date(2024, 1, 1)
+
+    # Act
+    count, revenue = crud.daily_summary(db, empty_day)
+
+    # Assert
+    assert count == 0
+    assert revenue == pytest.approx(0.0)
+
+
+def test_create_product_with_negative_price_should_fail():
+    """Тест 2: Создание товара с отрицательной ценой должно вызвать ошибку Pydantic"""
+    # Arrange & Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        schemas.ProductCreate(
+            sku="NEG-PRICE",
+            name="Товар с отрицательной ценой",
+            category="Test",
+            price=-5000.0,
+        )
+    
+    errors = exc_info.value.errors()
+    assert len(errors) == 1
+    assert errors[0]['loc'][0] == 'price'
+    assert 'greater_than' in errors[0]['type']
+
+
+def test_create_product_with_zero_price_should_fail():
+    """Тест 3: Создание товара с нулевой ценой должно вызвать ошибку Pydantic"""
+    # Arrange & Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        schemas.ProductCreate(
+            sku="ZERO-PRICE",
+            name="Товар с нулевой ценой",
+            category="Test",
+            price=0.0,
+        )
+    
+    errors = exc_info.value.errors()
+    assert len(errors) == 1
+    assert errors[0]['loc'][0] == 'price'
+    assert 'greater_than' in errors[0]['type']
+
+
+def test_create_product_with_fractional_price_success():
+    """Тест 4: Создание товара с дробной ценой должно быть успешным"""
+    # Arrange & Act
+    product = schemas.ProductCreate(
+        sku="FRACTIONAL",
+        name="Товар с дробной ценой",
+        category="Test",
+        price=5.55,
+    )
+    
+    # Assert
+    assert product.price == 5.55
+    assert isinstance(product.price, float)
+
+
+def test_create_product_with_short_name_should_fail():
+    """Создание товара с слишком коротким названием должно вызвать ошибку Pydantic"""
+    # Arrange & Act & Assert
+    with pytest.raises(ValidationError) as exc_info:
+        schemas.ProductCreate(
+            sku="SHORT",
+            name="A",  # Слишком короткое название
+            category="Test",
+            price=1000.0,
+        )
+    
+    errors = exc_info.value.errors()
+    assert len(errors) == 1
+    assert errors[0]['loc'][0] == 'name'
+    assert 'string_too_short' in errors[0]['type']

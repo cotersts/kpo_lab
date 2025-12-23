@@ -30,7 +30,7 @@ unit, BDD, GUI и нагрузочное.
 ### 1) Создание виртуального окружения
 
 **Windows (PowerShell):**
-```bash
+
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 
